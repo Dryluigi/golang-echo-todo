@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 
+	"github.com/Dryluigi/golang-todos/models"
 	"github.com/labstack/echo"
 )
 
@@ -16,7 +17,20 @@ type TodoResponse struct {
 
 func NewGetAllTodosController(e *echo.Echo, db *sql.DB) {
 	e.GET("/todos", func(ctx echo.Context) error {
-		rows, err := db.Query("SELECT * FROM todos")
+		user := ctx.Get("USER").(models.AuthJwtClaims)
+
+		allowed := false
+		for _, scope := range user.UserScopes {
+			if scope == "todos:read" {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return ctx.String(http.StatusForbidden, "Forbidden")
+		}
+
+		rows, err := db.Query("SELECT id, title, description, done FROM todos WHERE user_id = ?", user.UserId)
 		if err != nil {
 			return ctx.String(http.StatusInternalServerError, err.Error())
 		}
